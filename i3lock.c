@@ -100,7 +100,7 @@ void u8_dec(char *s, int *i) {
 }
 
 static int parse_color(const char *str, uint8_t color[]) {
-    char buf[6];
+    char buf[7];
     /* Skip # if present */
     if (str[0] == '#')
         str++;

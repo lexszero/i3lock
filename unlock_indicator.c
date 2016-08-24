@@ -185,7 +185,8 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
             cairo_show_text(xcb_ctx, text);
         }
     }
-    if (unlock_state >= STATE_KEY_PRESSED && unlock_indicator) {
+    if (unlock_indicator &&
+        (unlock_state >= STATE_KEY_PRESSED || pam_state > STATE_PAM_IDLE)) {
         cairo_scale(ctx, scaling_factor(), scaling_factor());
         /* Draw a (centered) circle with transparent background. */
         cairo_set_line_width(ctx, 10.0);
@@ -243,6 +244,7 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
         char buf[4];
 
         cairo_set_source_rgb(ctx, 0, 0, 0);
+        cairo_select_font_face(ctx, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(ctx, 28.0);
         switch (pam_state) {
             case STATE_PAM_VERIFY:
@@ -367,6 +369,7 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
  *
  */
 void redraw_screen(void) {
+    DEBUG("redraw_screen(unlock_state = %d, pam_state = %d)\n", unlock_state, pam_state);
     xcb_pixmap_t bg_pixmap = draw_image(last_resolution);
     xcb_change_window_attributes(conn, win, XCB_CW_BACK_PIXMAP, (uint32_t[1]){bg_pixmap});
     /* XXX: Possible optimization: Only update the area in the middle of the

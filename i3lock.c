@@ -43,6 +43,7 @@
     timer_obj = stop_timer(timer_obj)
 
 typedef void (*ev_callback_t)(EV_P_ ev_timer *w, int revents);
+static void input_done(void);
 
 char color[7] = "ffffff";
 uint8_t bgcolor[3] = {255, 255, 255};
@@ -68,6 +69,7 @@ extern unlock_state_t unlock_state;
 extern pam_state_t pam_state;
 int failed_attempts = 0;
 bool show_failed_attempts = false;
+bool retry_verification = false;
 
 static struct xkb_state *xkb_state;
 static struct xkb_context *xkb_context;
@@ -217,6 +219,17 @@ ev_timer *stop_timer(ev_timer *timer_obj) {
 }
 
 /*
+ * Neccessary calls after ending input via enter or others
+ *
+ */
+static void finish_input(void) {
+    password[input_position] = '\0';
+    unlock_state = STATE_KEY_PRESSED;
+    redraw_screen();
+    input_done();
+}
+
+/*
  * Resets pam_state to STATE_PAM_IDLE 2 seconds after an unsuccessful
  * authentication event.
  *
@@ -234,6 +247,12 @@ static void clear_pam_wrong(EV_P_ ev_timer *w, int revents) {
 
     /* Now free this timeout. */
     STOP_TIMER(clear_pam_wrong_timeout);
+
+    /* retry with input done during pam verification */
+    if (retry_verification) {
+        retry_verification = false;
+        finish_input();
+    }
 }
 
 static void clear_indicator_cb(EV_P_ ev_timer *w, int revents) {
@@ -401,17 +420,16 @@ static void handle_key_press(xcb_key_press_event_t *event) {
             if (ksym == XKB_KEY_j && !ctrl)
                 break;
 
-            if (pam_state == STATE_PAM_WRONG)
+            if (pam_state == STATE_PAM_WRONG) {
+                retry_verification = true;
                 return;
+            }
 
             if (skip_without_validation()) {
                 clear_input();
                 return;
             }
-            password[input_position] = '\0';
-            unlock_state = STATE_KEY_PRESSED;
-            redraw_screen();
-            input_done();
+            finish_input();
             skip_repeated_empty_password = true;
             return;
         default:
@@ -985,14 +1003,21 @@ int main(int argc, char *argv[]) {
                     image_path, cairo_status_to_string(cairo_surface_status(img)));
             img = NULL;
         }
+        free(image_path);
     }
 
     /* Pixmap on which the image is rendered to (if any) */
     xcb_pixmap_t bg_pixmap = draw_image(last_resolution);
 
-    /* open the fullscreen window, already with the correct pixmap in place */
+    /* Open the fullscreen window, already with the correct pixmap in place */
     win = open_fullscreen_window(conn, screen, color, bg_pixmap);
     xcb_free_pixmap(conn, bg_pixmap);
+
+    cursor = create_cursor(conn, screen, win, curs_choice);
+
+    /* Display the "locking…" message while trying to grab the pointer/keyboard. */
+    pam_state = STATE_PAM_LOCK;
+    grab_pointer_and_keyboard(conn, screen, cursor);
 
     pid_t pid = fork();
     /* The pid == -1 case is intentionally ignored here:
@@ -1006,9 +1031,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_SUCCESS);
     }
 
-    cursor = create_cursor(conn, screen, win, curs_choice);
-
-    grab_pointer_and_keyboard(conn, screen, cursor);
     /* Load the keymap again to sync the current modifier state. Since we first
      * loaded the keymap, there might have been changes, but starting from now,
      * we should get all key presses/releases due to having grabbed the
@@ -1024,6 +1046,10 @@ int main(int argc, char *argv[]) {
         ev_timer_init(&clock_timer, clock_tick_cb, 1.0, 1.0);
         ev_timer_start(main_loop, &clock_timer);
     }
+
+    /* Explicitly call the screen redraw in case "locking…" message was displayed */
+    pam_state = STATE_PAM_IDLE;
+    redraw_screen();
 
     struct ev_io *xcb_watcher = calloc(sizeof(struct ev_io), 1);
     struct ev_check *xcb_check = calloc(sizeof(struct ev_check), 1);

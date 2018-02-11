@@ -20,7 +20,7 @@
 #include "i3lock.h"
 #include "xcb.h"
 #include "unlock_indicator.h"
-#include "xinerama.h"
+#include "randr.h"
 
 #define BUTTON_RADIUS 90
 #define BUTTON_SPACE (BUTTON_RADIUS + 5)
@@ -209,6 +209,10 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
                 cairo_set_source_rgba(ctx, 250.0 / 255, 0, 0, 0.75);
                 break;
             default:
+                if (unlock_state == STATE_NOTHING_TO_DELETE) {
+                    cairo_set_source_rgba(ctx, 250.0 / 255, 0, 0, 0.75);
+                    break;
+                }
                 cairo_set_source_rgba(ctx, 0, 0, 0, 0.75);
                 break;
         }
@@ -224,6 +228,11 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
                 cairo_set_source_rgb(ctx, 125.0 / 255, 51.0 / 255, 0);
                 break;
             case STATE_AUTH_IDLE:
+                if (unlock_state == STATE_NOTHING_TO_DELETE) {
+                    cairo_set_source_rgb(ctx, 125.0 / 255, 51.0 / 255, 0);
+                    break;
+                }
+
                 cairo_set_source_rgb(ctx, 51.0 / 255, 125.0 / 255, 0);
                 break;
         }
@@ -264,6 +273,9 @@ xcb_pixmap_t draw_image(uint32_t *resolution) {
                 text = "lock failed!";
                 break;
             default:
+                if (unlock_state == STATE_NOTHING_TO_DELETE) {
+                    text = "no input";
+                }
                 if (show_failed_attempts && failed_attempts > 0) {
                     if (failed_attempts > 999) {
                         text = "> 999";

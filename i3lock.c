@@ -44,6 +44,7 @@
 #include "cursors.h"
 #include "unlock_indicator.h"
 #include "randr.h"
+#include "dpi.h"
 
 #define TSTAMP_N_SECS(n) (n * 1.0)
 #define TSTAMP_N_MINS(n) (60 * TSTAMP_N_SECS(n))
@@ -470,6 +471,12 @@ static void handle_key_press(xcb_key_press_event_t *event) {
             return;
         default:
             skip_repeated_empty_password = false;
+            // A new password is being entered, but a previous one is pending.
+            // Discard the old one and clear the retry_verification flag.
+            if (retry_verification) {
+                retry_verification = false;
+                clear_input();
+            }
     }
 
     switch (ksym) {
@@ -681,7 +688,7 @@ static bool verify_png_image(const char *image_path) {
 
     // Check PNG header according to the specification, available at:
     // https://www.w3.org/TR/2003/REC-PNG-20031110/#5PNG-file-signature
-    static unsigned char PNG_REFERENCE_HEADER[8] = { 137, 80, 78, 71, 13, 10, 26, 10 };
+    static unsigned char PNG_REFERENCE_HEADER[8] = {137, 80, 78, 71, 13, 10, 26, 10};
     if (memcmp(PNG_REFERENCE_HEADER, png_header, sizeof(png_header)) != 0) {
         fprintf(stderr, "File \"%s\" does not start with a PNG header. i3lock currently only supports loading PNG files.\n", image_path);
         return false;
@@ -833,8 +840,7 @@ static void raise_loop(xcb_window_t window) {
     xcb_generic_event_t *event;
     int screens;
 
-    if ((conn = xcb_connect(NULL, &screens)) == NULL ||
-        xcb_connection_has_error(conn))
+    if (xcb_connection_has_error((conn = xcb_connect(NULL, &screens))) > 0)
         errx(EXIT_FAILURE, "Cannot open display\n");
 
     /* We need to know about the window being obscured or getting destroyed. */
@@ -1063,6 +1069,8 @@ int main(int argc, char *argv[]) {
     load_compose_table(locale);
 
     screen = xcb_setup_roots_iterator(xcb_get_setup(conn)).data;
+
+    init_dpi();
 
     randr_init(&randr_base, screen->root);
     randr_query(screen->root);

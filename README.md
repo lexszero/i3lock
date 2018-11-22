@@ -18,20 +18,17 @@ Many little improvements have been made to i3lock over time:
 - i3lock uses PAM and therefore is compatible with LDAP etc.
   On OpenBSD i3lock uses the bsd_auth(3) framework.
 
+Differences of this fork from upstream
+--------------------------------------
+
+- Cool clock on the lockscreen `-T` flag
+- No autoshit
+
 Requirements
 ------------
-- pkg-config
-- libxcb
-- libxcb-util
-- libpam-dev
-- libcairo-dev
-- libxcb-xinerama
-- libxcb-randr
-- libev
-- libx11-dev
-- libx11-xcb-dev
-- libxkbcommon >= 0.5.0
-- libxkbcommon-x11 >= 0.5.0
+
+Look into [`travis/Dockerfile`](travis/Dockerfile) for a list of
+`apt install`'able dependencies.
 
 Running i3lock
 -------------
@@ -43,4 +40,4 @@ authentication helpers, e.g. `/usr/libexec/auth/login_passwd`.
 
 Upstream
 --------
-Please submit pull requests to https://github.com/i3/i3lock
+Please submit pull requests to https://github.com/lexszero/i3lock
